@@ -362,17 +362,20 @@ void ROTARYCheck() {
 // check and activate/deactivate sleep modes
 void SLEEPCheck() {
   if (handleMoved) {                    // if handle was moved
-    if (inSleepMode) {                  // in sleep or off mode?
+    if (inSleepMode && !handleDocked) { // in sleep or off mode? and not docked (ready to work)
       if ((CurrentTemp + 20) < SetTemp) // if temp is well below setpoint
         analogWrite(CONTROL_PIN, HEATER_ON);    // then start the heater right now
+      inSleepMode = false;              // reset sleep flag
       beep();                           // beep on wake-up
       beepIfWorky = true;               // beep again when working temperature is reached
     }
     handleMoved = false;                // reset handleMoved flag
-    inSleepMode = false;                // reset sleep flag
     inOffMode   = false;                // reset off flag
     sleepmillis = millis();             // reset sleep timer
   }
+
+  // check if handle is docked
+  if ( (!inSleepMode) && handleDocked ) {inSleepMode = true; beep();}
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
@@ -385,6 +388,8 @@ void SLEEPCheck() {
 void SENSORCheck() {
   analogWrite(CONTROL_PIN, HEATER_OFF);       // shut off heater in order to measure temperature
   delayMicroseconds(TIME2SETTLE);             // wait for voltage to settle
+
+  handleDocked = (DockinDistance > 0) && (getHandleLight() >= DockinDistance);  // set flag if handle is docked
   
   double temp = denoiseAnalog(SENSOR_PIN);    // read ADC value for temperature
   uint8_t d = digitalRead(SWITCH_PIN);        // check handle vibration switch
