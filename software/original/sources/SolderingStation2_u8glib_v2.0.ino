@@ -9,6 +9,7 @@
 // - Boost mode by short pressing rotary encoder switch
 // - Setup menu by long pressing rotary encoder switch
 // - Handle movement detection (by checking ball switch)
+// - Handle docked detection (by IR distance sensor)
 // - Iron unconnected detection (by idenfying invalid temperature readings)
 // - Time driven sleep/power off mode if iron is unused (movement detection)
 // - Measurement of input voltage, Vcc and ATmega's internal temperature
@@ -83,6 +84,12 @@
 #define CONTROL_PIN    9        // heater MOSFET PWM control
 #define SWITCH_PIN    10        // handle vibration switch
 
+// IR sensor Pins
+#define DOCKDETT_PIN  A6        // IR sensor (top) (screen flipped)
+#define DOCKDETB_PIN  A7        // IR sensor (bottom)
+#define IRPOWT_PIN     4        // IR sensor power supply (top) (screen flipped)
+#define IRPOWB_PIN    16        // IR sensor power supply (bottom)
+
 // Default temperature control values (recommended soldering temperature: 300-380°C)
 #define TEMP_MIN      150       // min selectable temperature
 #define TEMP_MAX      400       // max selectable temperature
@@ -104,6 +111,9 @@
 #define TIME2SLEEP     5        // time to enter sleep mode in minutes
 #define TIME2OFF      15        // time to shut off heater in minutes
 #define TIMEOFBOOST   40        // time to stay in boost mode in seconds
+
+// Default handle docked distance values (0 = disabled)
+#define DOCKINDISTANCE 0        // judgment value of handle docked. the closer the handle is, the higher the value
 
 // Control values
 #define TIME2SETTLE   950       // time in microseconds to allow OpAmp output to settle
@@ -141,6 +151,7 @@ uint8_t   BoostTemp   = TEMP_BOOST;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
 uint8_t   timeOfBoost = TIMEOFBOOST;
+uint16_t  DockinDistance = DOCKINDISTANCE;
 uint8_t   MainScrType = MAINSCREEN;
 bool      PIDenable   = PID_ENABLE;
 bool      beepEnable  = BEEP_ENABLE;
@@ -226,6 +237,10 @@ void setup() {
   // set the pin modes
   pinMode(SENSOR_PIN,   INPUT);
   pinMode(VIN_PIN,      INPUT);
+  pinMode(DOCKDETB_PIN, INPUT);
+  pinMode(DOCKDETT_PIN, INPUT);
+  pinMode(IRPOWB_PIN,   OUTPUT);
+  pinMode(IRPOWT_PIN,   OUTPUT);
   pinMode(BUZZER_PIN,   OUTPUT);
   pinMode(CONTROL_PIN,  OUTPUT);
   pinMode(ROTARY_1_PIN, INPUT_PULLUP);
@@ -234,6 +249,8 @@ void setup() {
   pinMode(SWITCH_PIN,   INPUT_PULLUP);
   
   analogWrite(CONTROL_PIN, HEATER_OFF); // this shuts off the heater
+  digitalWrite(IRPOWB_PIN, LOW);        // must be LOW when IR sensor not in use
+  digitalWrite(IRPOWT_PIN, LOW);        // must be LOW when IR sensor not in use
   digitalWrite(BUZZER_PIN, LOW);        // must be LOW when buzzer not in use
 
   // setup ADC
@@ -257,6 +274,9 @@ void setup() {
 
   // set screen flip
   SetFlip();
+
+  // enable IR senor
+  SetIR();
 
   // read supply voltages in mV
   Vcc = getVCC(); Vin = getVIN();
@@ -464,16 +484,17 @@ void getEEPROM() {
     time2sleep  =  EEPROM.read(7);
     time2off    =  EEPROM.read(8);
     timeOfBoost =  EEPROM.read(9);
-    MainScrType =  EEPROM.read(10);
-    PIDenable   =  EEPROM.read(11);
-    beepEnable  =  EEPROM.read(12);
-    BodyFlip    =  EEPROM.read(13);
-    ECReverse   =  EEPROM.read(14);
-    CurrentTip  =  EEPROM.read(15);
-    NumberOfTips = EEPROM.read(16);
+    DockinDistance = (EEPROM.read(10) << 8) | EEPROM.read(11);
+    MainScrType =  EEPROM.read(12);
+    PIDenable   =  EEPROM.read(13);
+    beepEnable  =  EEPROM.read(14);
+    BodyFlip    =  EEPROM.read(15);
+    ECReverse   =  EEPROM.read(16);
+    CurrentTip  =  EEPROM.read(17);
+    NumberOfTips = EEPROM.read(18);
 
     uint8_t i, j;
-    uint16_t counter = 17;
+    uint16_t counter = 19;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -501,16 +522,18 @@ void updateEEPROM() {
   EEPROM.update( 7, time2sleep);
   EEPROM.update( 8, time2off);
   EEPROM.update( 9, timeOfBoost);
-  EEPROM.update(10, MainScrType);
-  EEPROM.update(11, PIDenable);
-  EEPROM.update(12, beepEnable);
-  EEPROM.update(13, BodyFlip);
-  EEPROM.update(14, ECReverse);
-  EEPROM.update(15, CurrentTip);
-  EEPROM.update(16, NumberOfTips);
+  EEPROM.update(10, DockinDistance >> 8);
+  EEPROM.update(11, DockinDistance & 0xFF);
+  EEPROM.update(12, MainScrType);
+  EEPROM.update(13, PIDenable);
+  EEPROM.update(14, beepEnable);
+  EEPROM.update(15, BodyFlip);
+  EEPROM.update(16, ECReverse);
+  EEPROM.update(17, CurrentTip);
+  EEPROM.update(18, NumberOfTips);
 
   uint8_t i, j;
-  uint16_t counter = 17;
+  uint16_t counter = 19;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
@@ -525,6 +548,15 @@ void updateEEPROM() {
 void SetFlip() {
   if (BodyFlip) u8g.setRot180();
   else          u8g.undoRotation();
+}
+
+
+// check state and set IR sensor
+void SetIR() {
+  if (DockinDistance > 0) {
+    if (BodyFlip) {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN, HIGH);}
+    else          {digitalWrite(IRPOWB_PIN, HIGH); digitalWrite(IRPOWT_PIN,  LOW);}
+  } else          {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN,  LOW);}
 }
 
 
@@ -588,7 +620,7 @@ void SetupScreen() {
       case 3:   PIDenable = MenuScreen(ControlTypeItems, sizeof(ControlTypeItems), PIDenable); break;
       case 4:   MainScrType = MenuScreen(MainScreenItems, sizeof(MainScreenItems), MainScrType); break;
       case 5:   beepEnable = MenuScreen(BuzzerItems, sizeof(BuzzerItems), beepEnable); break;
-      case 6:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); break;
+      case 6:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); SetIR(); break;
       case 7:   ECReverse = MenuScreen(ECReverseItems, sizeof(ECReverseItems), ECReverse); break;
       case 8:   InfoScreen(); break;
       default:  repeat = false; break;
