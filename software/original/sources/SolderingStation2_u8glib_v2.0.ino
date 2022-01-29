@@ -337,7 +337,7 @@ void ROTARYCheck() {
     while( (!digitalRead(BUTTON_PIN)) && ((millis() - buttonmillis) < 500) );
     if ((millis() - buttonmillis) >= 500) SetupScreen();
     else {
-      inBoostMode = !inBoostMode;
+      inBoostMode = handleDocked ? false : !inBoostMode;
       if (inBoostMode) boostmillis = millis();
       handleMoved = true;
     }
@@ -359,21 +359,22 @@ void ROTARYCheck() {
 // check and activate/deactivate sleep modes
 void SLEEPCheck() {
   if (handleMoved) {                    // if handle was moved
-    if (inSleepMode) {                  // in sleep or off mode?
+    if (inSleepMode && !handleDocked) { // in sleep or off mode? and not docked (ready to work)
       if ((CurrentTemp + 20) < SetTemp) // if temp is well below setpoint
         analogWrite(CONTROL_PIN, HEATER_ON);    // then start the heater right now
       beep();                           // beep on wake-up
       beepIfWorky = true;               // beep again when working temperature is reached
+    inSleepMode = false;                // reset sleep flag
     }
     handleMoved = false;                // reset handleMoved flag
-    inSleepMode = false;                // reset sleep flag
     inOffMode   = false;                // reset off flag
     sleepmillis = millis();             // reset sleep timer
   }
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; inBoostMode = false; beep();}
+  handleDocked = (DockinDistance > 0) && (getHandleDistance() >= DockinDistance);  // check the docking state of the handle
+  if ( (!inSleepMode) && ( ((time2sleep > 0) && (goneMinutes >= time2sleep)) || handleDocked ) ) {inSleepMode = true; inBoostMode = false; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
 
@@ -576,7 +577,8 @@ void MainScreen() {
     u8g.setFontPosTop();
     u8g.drawStr( 0, 0,  "SET:");
     u8g.setPrintPos(40,0);
-    u8g.print(Setpoint, 0);
+    if (handleDocked && (((millis() - sleepmillis) / 1000) < 5)) {u8g.print(SetTemp); u8g.print(F("*"));}
+    else                                                          u8g.print(Setpoint, 0);
 
     // draw status of heater
     u8g.setPrintPos(83,0);
@@ -893,6 +895,7 @@ void ChangeTipScreen() {
 
 // temperature calibration screen
 void CalibrationScreen() {
+  inSleepMode ? inSleepMode = false : inBoostMode = false;
   uint16_t CalTempNew[4]; 
   for (uint8_t CalStep = 0; CalStep < 3; CalStep++) {
     SetTemp = CalTemp[CurrentTip][CalStep];
