@@ -78,19 +78,19 @@
 // Default temperature control values (recommended soldering temperature: 300-380°C)
 #define TEMP_MIN      150       // min selectable temperature
 #define TEMP_MAX      400       // max selectable temperature
-#define TEMP_DEFAULT  320       // default start setpoint
+#define TEMP_DEFAULT  280       // default start setpoint
 #define TEMP_SLEEP    150       // temperature in sleep mode
 #define TEMP_BOOST     50       // temperature increase in boost mode
 #define TEMP_STEP      10       // rotary encoder temp change steps
 
 // Default tip temperature calibration values
-#define TEMP200       216       // temperature at ADC = 200
-#define TEMP280       308       // temperature at ADC = 280
-#define TEMP360       390       // temperature at ADC = 360
+#define TEMP200       220       // temperature at ADC = 200
+#define TEMP280       300       // temperature at ADC = 280
+#define TEMP360       388       // temperature at ADC = 360
 #define TEMPCHP       30        // chip temperature while calibration
 #define TIPMAX        8         // max number of tips
 #define TIPNAMELENGTH 6         // max length of tip names (including termination)
-#define TIPNAME       "BC1.5"   // default tip name
+#define TIPNAME       "HAKKO"   // default tip name
 
 // Default timer values (0 = disabled)
 #define TIME2SLEEP     5        // time to enter sleep mode in minutes
