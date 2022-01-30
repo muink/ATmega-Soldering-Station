@@ -115,6 +115,7 @@
 
 // Default handle docked distance values (0 = disabled)
 #define DOCKINDISTANCE 0        // judgment value of handle docked. the closer the handle is, the higher the value
+#define DOCKINBITDEPTH 11       // IR sensor sampling depth. allowed values: 10-12
 
 // Control values
 #define TIME2SETTLE   950       // time in microseconds to allow OpAmp output to settle
@@ -168,7 +169,7 @@ uint8_t   NumberOfTips = 1;
 
 // Menu items
 const char *SetupItems[]       = { "Setup Menu", "Tip Settings", "Temp Settings",
-                                   "Timer Settings", "Control Type", "Main Screen",
+                                   "Timer Settings", "Dock Settings", "Control Type", "Main Screen",
                                    "Buzzer", "Screen Flip", "EC Reverse", "Information", "Return" };
 const char *TipItems[]         = { "Tip:", "Change Tip", "Calibrate Tip", 
                                    "Rename Tip", "Delete Tip", "Add new Tip", "Return" };
@@ -189,6 +190,7 @@ const char *BoostTempItems[]   = { "Boost Temp", "\xB0""C" };
 const char *SleepTimerItems[]  = { "Sleep Timer", "Minutes" };
 const char *OffTimerItems[]    = { "Off Timer", "Minutes" };
 const char *BoostTimerItems[]  = { "Boost Timer", "Seconds" };
+const char *DistanceItems[]    = { "Set Distance", "Glows" };
 const char *DeleteMessage[]    = { "Warning", "You cannot", "delete your", "last tip!" };
 const char *MaxTipMessage[]    = { "Warning", "You reached", "maximum number", "of tips!" };
 
@@ -196,7 +198,7 @@ const char *MaxTipMessage[]    = { "Warning", "You reached", "maximum number", "
 volatile uint8_t  a0, b0, c0, d0;
 volatile bool     ab0;
 volatile int      count, countMin, countMax, countStep;
-volatile bool     handleMoved;
+volatile bool     handleMoved, handleDocked = true;
  
 // Variables for temperature control
 uint16_t  SetTemp, ShowTemp, gap, Step;
@@ -622,12 +624,13 @@ void SetupScreen() {
       case 0:   TipScreen(); repeat = false; break;
       case 1:   TempScreen(); break;
       case 2:   TimerScreen(); break;
-      case 3:   PIDenable = MenuScreen(ControlTypeItems, sizeof(ControlTypeItems), PIDenable); break;
-      case 4:   MainScrType = MenuScreen(MainScreenItems, sizeof(MainScreenItems), MainScrType); break;
-      case 5:   beepEnable = MenuScreen(BuzzerItems, sizeof(BuzzerItems), beepEnable); break;
-      case 6:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); SetIR(); break;
-      case 7:   ECReverse = MenuScreen(ECReverseItems, sizeof(ECReverseItems), ECReverse); break;
-      case 8:   InfoScreen(); break;
+      case 3:   DockScreen(); break;
+      case 4:   PIDenable = MenuScreen(ControlTypeItems, sizeof(ControlTypeItems), PIDenable); break;
+      case 5:   MainScrType = MenuScreen(MainScreenItems, sizeof(MainScreenItems), MainScrType); break;
+      case 6:   beepEnable = MenuScreen(BuzzerItems, sizeof(BuzzerItems), beepEnable); break;
+      case 7:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); SetIR(); break;
+      case 8:   ECReverse = MenuScreen(ECReverseItems, sizeof(ECReverseItems), ECReverse); break;
+      case 9:   InfoScreen(); break;
       default:  repeat = false; break;
     }
   }  
@@ -802,6 +805,47 @@ void InfoScreen() {
   } while (digitalRead(BUTTON_PIN) || lastbutton);
 
   beep();
+}
+
+
+// dock settings screen
+void DockScreen(){
+  uint8_t selected = 0;
+  bool repeat = true;
+  while (repeat) {
+    uint8_t lastselected = selected;
+    int8_t arrow = 0;
+    setRotary(0, 1, 1, selected);
+    bool lastbutton = (!digitalRead(BUTTON_PIN));
+
+    do {
+      uint16_t Distance = getHandleLight();
+      handleDocked = (Distance >= DockinDistance);
+
+      selected = getRotary();
+      arrow = constrain(arrow + selected - lastselected, 0, 1);
+      lastselected = selected;
+      u8g.firstPage();
+        do {
+          u8g.setFont(u8g_font_9x15);
+          u8g.setFontPosTop();
+          u8g.setPrintPos(0,   0); u8g.print(F("Distance: ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(Distance);
+          u8g.setPrintPos(0,  16); u8g.print(F("Docked: ")); u8g.print(DockinDistance == 0 ? "N/A" : (handleDocked ? "Yes" : " No") );
+          u8g.drawStr(0, 16 * (arrow + 2), ">");
+          u8g.setPrintPos(12, 32); u8g.print(F("Set Distance"));
+          u8g.setPrintPos(12, 48); u8g.print(F("Return"));
+        } while(u8g.nextPage());
+      if (lastbutton && digitalRead(BUTTON_PIN)) {delay(10); lastbutton = false;}
+    } while (digitalRead(BUTTON_PIN) || lastbutton);
+
+    beep();
+
+    switch (selected) {
+      case 0:   setRotary(0, 1<<DOCKINBITDEPTH, 1, DockinDistance);
+                DockinDistance = InputScreen(DistanceItems); SetIR(); break;
+      default:  repeat = false; break;
+    }
+  }
 }
 
 
@@ -1008,6 +1052,14 @@ uint16_t getVIN() {
   result = denoiseAnalog (VIN_PIN);     // read supply voltage via voltage divider
   // result/1023 * Vcc / R13 = Vin / (R12 + R13)
   return (result * Vcc / 179.474);      // 179.474 = 1023 * R13 / (R12 + R13)
+}
+
+
+// get Handle Distanse
+uint16_t getHandleLight() {
+  uint16_t result;
+  result = denoiseAnalog(BodyFlip ? DOCKDETT_PIN : DOCKDETB_PIN, DOCKINBITDEPTH); // read handle light
+  return (result + 1);
 }
 
 
