@@ -115,7 +115,7 @@
 #define TIMEOFBOOST   40        // time to stay in boost mode in seconds
 
 // Default handle docked distance values (0 = disabled)
-#define DOCKINDISTANCE 0        // judgment value of handle docked. the closer the handle is, the higher the value
+#define DOCKINDISTANCE 12       // judgment value of handle docked. the closer the handle is, the higher the value
 #define DOCKINBITDEPTH 11       // IR sensor sampling depth. allowed values: 10-12
 
 // Control values
@@ -618,7 +618,7 @@ void MainScreen() {
     u8g.drawStr( 0, 0,  "SET:");
     u8g.setPrintPos(40,0);
     // when handle is docked, move the handle (handleMoved = true) will briefly display the set temperature
-    if ( handleDocked && (((millis() - sleepmillis) / 1000) < 5) ) {u8g.print(SetTemp); u8g.print("*");}
+    if ( handleDocked && (((millis() - sleepmillis) / 1000) < 3) ) {u8g.print(SetTemp); u8g.print("*");}
     else                                                            u8g.print(Setpoint, 0);
 
     // draw status of heater
