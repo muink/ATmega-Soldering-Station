@@ -45,6 +45,11 @@
 // Project Files (EasyEDA): https://easyeda.com/wagiminator
 // Project Files (Github):  https://github.com/wagiminator
 // License: http://creativecommons.org/licenses/by-sa/3.0/
+//
+// 2022 by dropair & muink
+// Project Files (EasyEDA): https://easyeda.com/dropair/z-solderingstation-smd-v2_copy
+// Project Files (Github):  https://github.com/muink/ATmega-Soldering-Station
+// License: http://creativecommons.org/licenses/by-sa/3.0/
 
 
 // Libraries
@@ -55,7 +60,7 @@
 #include <avr/sleep.h>          // for sleeping during ADC sampling
 
 // Hardware version
-#define HWVERSION     "v2.8E"
+#define HWVERSION     "v2.8"
 
 // Firmware version
 #define VERSION       "v1.9"
@@ -80,8 +85,8 @@
 #define SWITCH_PIN    10        // handle vibration switch
 
 // IR sensor Pins
-#define DOCKDETT_PIN  A7        // IR sensor (top) (screen flipped)
-#define DOCKDETB_PIN  A6        // IR sensor (bottom)
+#define DOCKDETT_PIN  A6        // IR sensor (top) (screen flipped)
+#define DOCKDETB_PIN  A7        // IR sensor (bottom)
 #define IRPOWT_PIN     4        // IR sensor power supply (top) (screen flipped)
 #define IRPOWB_PIN    16        // IR sensor power supply (bottom)
 
@@ -108,7 +113,7 @@
 #define TIMEOFBOOST   40        // time to stay in boost mode in seconds
 
 // Default handle docked distance values (0 = disabled)
-#define DOCKINDISTANCE 0        // judgment value of handle docked. the closer the handle is, the higher the value
+#define DOCKINDISTANCE 12       // judgment value of handle docked. the closer the handle is, the higher the value
 #define DOCKINBITDEPTH 11       // IR sensor sampling depth. allowed values: 10-12
 
 // Control values
@@ -596,7 +601,7 @@ void MainScreen() {
     u8g.setFontPosTop();
     u8g.drawStr( 0, 0,  "SET:");
     u8g.setPrintPos(40,0);
-    if (handleDocked && (((millis() - sleepmillis) / 1000) < 5)) {u8g.print(SetTemp); u8g.print(F("*"));}
+    if (handleDocked && (((millis() - sleepmillis) / 1000) < 3)) {u8g.print(SetTemp); u8g.print(F("*"));}
     else                                                          u8g.print(Setpoint, 0);
 
     // draw status of heater
