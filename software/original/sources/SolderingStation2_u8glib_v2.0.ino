@@ -190,7 +190,7 @@ const char *BoostTempItems[]   = { "Boost Temp", "\xB0""C" };
 const char *SleepTimerItems[]  = { "Sleep Timer", "Minutes" };
 const char *OffTimerItems[]    = { "Off Timer", "Minutes" };
 const char *BoostTimerItems[]  = { "Boost Timer", "Seconds" };
-const char *DistanceItems[]    = { "Set Distance", "Glows" };
+const char *DistanceItems[]    = { "Set Distance", "\x4A" };
 const char *DeleteMessage[]    = { "Warning", "You cannot", "delete your", "last tip!" };
 const char *MaxTipMessage[]    = { "Warning", "You reached", "maximum number", "of tips!" };
 
@@ -750,6 +750,7 @@ void MessageScreen(const char *Items[], uint8_t numberOfItems) {
 // input value screen
 uint16_t InputScreen(const char *Items[]) {
   uint16_t  value;
+  bool isDistanceScreen = (Items[0] == "Set Distance");
   bool      lastbutton = (!digitalRead(BUTTON_PIN));
 
   do {
@@ -761,7 +762,15 @@ uint16_t InputScreen(const char *Items[]) {
         u8g.drawStr( 0, 0,  Items[0]);
         u8g.setPrintPos(0, 32); u8g.print(">"); u8g.setPrintPos(10, 32);        
         if (value == 0)  u8g.print(F("Deactivated"));
-        else            {u8g.print(value);u8g.print(" ");u8g.print(Items[1]);}
+        else {
+          u8g.print(value);u8g.print(" ");
+          if (isDistanceScreen) {
+            uint8_t w = u8g.getStrWidth(String(value).c_str()) + u8g.getStrWidth(" ");
+            u8g.setFont(u8g_font_9x15_78_79); int8_t symh = u8g.getFontAscent();
+            u8g.setPrintPos(10 + w, 32 + symh);
+          }
+          u8g.print(Items[1]);
+        }
       } while(u8g.nextPage());
     if (lastbutton && digitalRead(BUTTON_PIN)) {delay(10); lastbutton = false;}
   } while (digitalRead(BUTTON_PIN) || lastbutton);
