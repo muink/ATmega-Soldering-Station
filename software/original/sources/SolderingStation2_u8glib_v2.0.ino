@@ -338,7 +338,7 @@ void SLEEPCheck() {
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; beep();}
+  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; inBoostMode = false; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
 
