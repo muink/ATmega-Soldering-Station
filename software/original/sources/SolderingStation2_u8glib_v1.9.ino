@@ -280,7 +280,7 @@ void setup() {
 
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
-  RawTemp  = denoiseAnalog(10, SENSOR_PIN);
+  RawTemp  = denoiseAnalog(DEFAULT, 10, SENSOR_PIN);
   ChipTemp = getChipTemp();
   calculateTemp();
 
@@ -374,7 +374,7 @@ void SENSORCheck() {
   analogWrite(CONTROL_PIN, HEATER_OFF);       // shut off heater in order to measure temperature
   delayMicroseconds(TIME2SETTLE);             // wait for voltage to settle
   
-  double temp = denoiseAnalog(10, SENSOR_PIN);    // read ADC value for temperature
+  double temp = denoiseAnalog(DEFAULT, 10, SENSOR_PIN);    // read ADC value for temperature
   uint8_t d = digitalRead(SWITCH_PIN);        // check handle vibration switch
   if (d != d0) {handleMoved = true; d0 = d;}  // set flag if handle was moved
   if (! SensorCounter--) Vin = getVIN();      // get Vin every now and then
@@ -406,7 +406,7 @@ void SENSORCheck() {
     ChangeTipScreen();                        // show tip selection screen
     updateEEPROM();                           // update setting in EEPROM
     handleMoved = true;                       // reset all timers
-    RawTemp  = denoiseAnalog(10, SENSOR_PIN);     // restart temp smooth algorithm
+    RawTemp  = denoiseAnalog(DEFAULT, 10, SENSOR_PIN);     // restart temp smooth algorithm
     c0 = LOW;                                 // switch must be released
     setRotary(TEMP_MIN, TEMP_MAX, TEMP_STEP, SetTemp);  // reset rotary encoder
   }
@@ -975,13 +975,13 @@ void AddTipScreen() {
 
 
 // average several ADC readings in sleep mode to denoise
-uint16_t denoiseAnalog (uint8_t analog_deep, byte port) {
+uint16_t denoiseAnalog (uint8_t analog_reference, uint8_t analog_deep, byte port) {
   uint32_t buffer = 0;
   analog_deep = constrain(analog_deep, 10, 13) - 10;
   uint8_t average = constrain(6 - (analog_deep<<1), 0, 5);
   ADCSRA |= bit (ADEN) | bit (ADIF);    // enable ADC, turn off any pending interrupt
   if (port >= A0) port -= A0;           // set port and
-  ADMUX = (0x0F & port) | bit(REFS0);   // reference to AVcc 
+  ADMUX = (0x0F & port) | (analog_reference << 6);
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
   for (uint8_t i=0; i<(1 << analog_deep*2+average); i++) { // (10+analog_deep)bit OSR * 2^average
     sleep_mode();                       // go to sleep while taking ADC sample
@@ -1033,7 +1033,7 @@ uint16_t getVCC() {
 // get supply voltage in mV
 uint16_t getVIN() {
   long result;
-  result = denoiseAnalog (10, VIN_PIN);     // read supply voltage via voltage divider
+  result = denoiseAnalog (DEFAULT, 10, VIN_PIN);     // read supply voltage via voltage divider
   return (result * Vcc / 179.474);      // 179.474 = 1023 * R13 / (R12 + R13)
 }
 
@@ -1041,7 +1041,7 @@ uint16_t getVIN() {
 // get Handle Distanse
 uint16_t getHandleDistance() {
   uint16_t result;
-  result = BodyFlip ? denoiseAnalog(DOCKINBITDEPTH, DOCKDETT_PIN) : denoiseAnalog(DOCKINBITDEPTH, DOCKDETB_PIN);
+  result = BodyFlip ? denoiseAnalog(DEFAULT, DOCKINBITDEPTH, DOCKDETT_PIN) : map(denoiseAnalog(INTERNAL, 10, DOCKDETB_PIN), 0, 1023, 0, 511);
   return (result + 1);
 }
 
