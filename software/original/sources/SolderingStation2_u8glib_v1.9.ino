@@ -109,6 +109,7 @@
 
 // Default handle docked distance values (0 = disabled)
 #define DOCKINDISTANCE 0        // judgment value of handle docked. the closer the handle is, the higher the value
+#define DOCKINBITDEPTH 11       // IR sensor sampling depth. allowed values: 10-12
 
 // Control values
 #define TIME2SETTLE   950       // time in microseconds to allow OpAmp output to settle
@@ -279,7 +280,7 @@ void setup() {
 
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
-  RawTemp  = denoiseAnalog(SENSOR_PIN);
+  RawTemp  = denoiseAnalog(10, SENSOR_PIN);
   ChipTemp = getChipTemp();
   calculateTemp();
 
@@ -373,7 +374,7 @@ void SENSORCheck() {
   analogWrite(CONTROL_PIN, HEATER_OFF);       // shut off heater in order to measure temperature
   delayMicroseconds(TIME2SETTLE);             // wait for voltage to settle
   
-  double temp = denoiseAnalog(SENSOR_PIN);    // read ADC value for temperature
+  double temp = denoiseAnalog(10, SENSOR_PIN);    // read ADC value for temperature
   uint8_t d = digitalRead(SWITCH_PIN);        // check handle vibration switch
   if (d != d0) {handleMoved = true; d0 = d;}  // set flag if handle was moved
   if (! SensorCounter--) Vin = getVIN();      // get Vin every now and then
@@ -405,7 +406,7 @@ void SENSORCheck() {
     ChangeTipScreen();                        // show tip selection screen
     updateEEPROM();                           // update setting in EEPROM
     handleMoved = true;                       // reset all timers
-    RawTemp  = denoiseAnalog(SENSOR_PIN);     // restart temp smooth algorithm
+    RawTemp  = denoiseAnalog(10, SENSOR_PIN);     // restart temp smooth algorithm
     c0 = LOW;                                 // switch must be released
     setRotary(TEMP_MIN, TEMP_MAX, TEMP_STEP, SetTemp);  // reset rotary encoder
   }
@@ -829,7 +830,7 @@ void DockScreen(){
     beep();
 
     switch (selected) {
-      case 0:   setRotary(0, 1024, 1, DockinDistance);
+      case 0:   setRotary(0, 1<<DOCKINBITDEPTH, 1, DockinDistance);
                 DockinDistance = InputScreen(DistanceItems); SetIR(); break;
       default:  repeat = false; break;
     }
@@ -974,19 +975,21 @@ void AddTipScreen() {
 
 
 // average several ADC readings in sleep mode to denoise
-uint16_t denoiseAnalog (byte port) {
-  uint16_t result = 0;
+uint16_t denoiseAnalog (uint8_t analog_deep, byte port) {
+  uint32_t buffer = 0;
+  analog_deep = constrain(analog_deep, 10, 13) - 10;
+  uint8_t average = constrain(6 - (analog_deep<<1), 0, 5);
   ADCSRA |= bit (ADEN) | bit (ADIF);    // enable ADC, turn off any pending interrupt
   if (port >= A0) port -= A0;           // set port and
   ADMUX = (0x0F & port) | bit(REFS0);   // reference to AVcc 
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
-  for (uint8_t i=0; i<32; i++) {        // get 32 readings
+  for (uint8_t i=0; i<(1 << analog_deep*2+average); i++) { // (10+analog_deep)bit OSR * 2^average
     sleep_mode();                       // go to sleep while taking ADC sample
     while (bitRead(ADCSRA, ADSC));      // make sure sampling is completed
-    result += ADC;                      // add them up
+    buffer += ADC;                      // add them up
   }
   bitClear (ADCSRA, ADEN);              // disable ADC
-  return (result >> 5);                 // devide by 32 and return value
+  return (buffer >> (analog_deep + average)); // convert to (10+analog_deep)bit devide by 2^analog_deep
 }
 
 
@@ -1030,7 +1033,7 @@ uint16_t getVCC() {
 // get supply voltage in mV
 uint16_t getVIN() {
   long result;
-  result = denoiseAnalog (VIN_PIN);     // read supply voltage via voltage divider
+  result = denoiseAnalog (10, VIN_PIN);     // read supply voltage via voltage divider
   return (result * Vcc / 179.474);      // 179.474 = 1023 * R13 / (R12 + R13)
 }
 
@@ -1038,7 +1041,7 @@ uint16_t getVIN() {
 // get Handle Distanse
 uint16_t getHandleDistance() {
   uint16_t result;
-  result = BodyFlip ? denoiseAnalog(DOCKDETT_PIN) : denoiseAnalog(DOCKDETB_PIN);
+  result = BodyFlip ? denoiseAnalog(DOCKINBITDEPTH, DOCKDETT_PIN) : denoiseAnalog(DOCKINBITDEPTH, DOCKDETB_PIN);
   return (result + 1);
 }
 
