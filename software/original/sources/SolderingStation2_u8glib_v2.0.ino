@@ -885,19 +885,21 @@ void AddTipScreen() {
 
 
 // average several ADC readings in sleep mode to denoise
-uint16_t denoiseAnalog (byte port) {
-  uint16_t result = 0;
+uint16_t denoiseAnalog (byte port, uint8_t analog_deep = 10) {
+  uint32_t result = 0;
+  analog_deep = constrain(analog_deep, 10, 13) - 10;
+  uint8_t average = 5;
   ADCSRA |= bit (ADEN) | bit (ADIF);    // enable ADC, turn off any pending interrupt
   if (port >= A0) port -= A0;           // set port and
   ADMUX = (0x0F & port) | bit(REFS0);   // reference to AVcc 
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
-  for (uint8_t i=0; i<32; i++) {        // get 32 readings
+  for (uint8_t i=0; i<(1 << analog_deep*2+average); i++) { // (10+analog_deep)bit OSR * 2^average
     sleep_mode();                       // go to sleep while taking ADC sample
     while (bitRead(ADCSRA, ADSC));      // make sure sampling is completed
     result += ADC;                      // add them up
   }
   bitClear (ADCSRA, ADEN);              // disable ADC
-  return (result >> 5);                 // devide by 32 and return value
+  return (result >> (analog_deep + average)); // convert to (10+analog_deep)bit devide by 2^analog_deep
 }
 
 
