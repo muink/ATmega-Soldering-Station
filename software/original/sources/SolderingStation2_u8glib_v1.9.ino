@@ -98,6 +98,10 @@
 #define TEMP_BOOST     50       // temperature increase in boost mode
 #define TEMP_STEP      10       // rotary encoder temp change steps
 
+// Internal offset values
+#define INTEMPOFF     155
+#define INREFVOFF     ???
+
 // Default tip temperature calibration values
 #define TEMP200       220       // temperature at ADC = 200
 #define TEMP280       300       // temperature at ADC = 280
@@ -149,6 +153,8 @@ double consKp=11, consKi=3, consKd=5;
 uint16_t  DefaultTemp = TEMP_DEFAULT;
 uint16_t  SleepTemp   = TEMP_SLEEP;
 uint16_t  DockinDistance = DOCKINDISTANCE;
+int       InTempOff   = INTEMPOFF;
+int       InRefvOff   = INREFVOFF;
 uint8_t   BoostTemp   = TEMP_BOOST;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
@@ -502,9 +508,11 @@ void getEEPROM() {
     CurrentTip  =  EEPROM.read(15);
     NumberOfTips = EEPROM.read(16);
     DockinDistance = EEPROM.read(17);
+    InTempOff   = EEPROM.read(18);
+    InRefvOff   = EEPROM.read(19);
 
     uint8_t i, j;
-    uint16_t counter = 18;
+    uint16_t counter = 20;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -540,9 +548,11 @@ void updateEEPROM() {
   EEPROM.update(15, CurrentTip);
   EEPROM.update(16, NumberOfTips);
   EEPROM.update(17, DockinDistance);
+  EEPROM.update(18, InTempOff);
+  EEPROM.update(19, InRefvOff);
 
   uint8_t i, j;
-  uint16_t counter = 18;
+  uint16_t counter = 20;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
