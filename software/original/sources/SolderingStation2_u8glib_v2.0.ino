@@ -466,19 +466,20 @@ void getEEPROM() {
     DefaultTemp = (EEPROM.read(2) << 8) | EEPROM.read(3);
     SleepTemp   = (EEPROM.read(4) << 8) | EEPROM.read(5);
     BoostTemp   =  EEPROM.read(6);
-    time2sleep  =  EEPROM.read(7);
-    time2off    =  EEPROM.read(8);
-    timeOfBoost =  EEPROM.read(9);
-    MainScrType =  EEPROM.read(10);
-    PIDenable   =  EEPROM.read(11);
-    beepEnable  =  EEPROM.read(12);
-    BodyFlip    =  EEPROM.read(13);
-    ECReverse   =  EEPROM.read(14);
-    CurrentTip  =  EEPROM.read(15);
-    NumberOfTips = EEPROM.read(16);
+    InTempOff   = (EEPROM.read(7) << 8) | EEPROM.read(8);
+    time2sleep  =  EEPROM.read(9);
+    time2off    =  EEPROM.read(10);
+    timeOfBoost =  EEPROM.read(11);
+    MainScrType =  EEPROM.read(12);
+    PIDenable   =  EEPROM.read(13);
+    beepEnable  =  EEPROM.read(14);
+    BodyFlip    =  EEPROM.read(15);
+    ECReverse   =  EEPROM.read(16);
+    CurrentTip  =  EEPROM.read(17);
+    NumberOfTips = EEPROM.read(18);
 
     uint8_t i, j;
-    uint16_t counter = 17;
+    uint16_t counter = 19;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -503,19 +504,21 @@ void updateEEPROM() {
   EEPROM.update( 4, SleepTemp >> 8);
   EEPROM.update( 5, SleepTemp & 0xFF);
   EEPROM.update( 6, BoostTemp);
-  EEPROM.update( 7, time2sleep);
-  EEPROM.update( 8, time2off);
-  EEPROM.update( 9, timeOfBoost);
-  EEPROM.update(10, MainScrType);
-  EEPROM.update(11, PIDenable);
-  EEPROM.update(12, beepEnable);
-  EEPROM.update(13, BodyFlip);
-  EEPROM.update(14, ECReverse);
-  EEPROM.update(15, CurrentTip);
-  EEPROM.update(16, NumberOfTips);
+  EEPROM.update( 7, (uint16_t)InTempOff >> 8);
+  EEPROM.update( 8, InTempOff & 0xFF);
+  EEPROM.update( 9, time2sleep);
+  EEPROM.update(10, time2off);
+  EEPROM.update(11, timeOfBoost);
+  EEPROM.update(12, MainScrType);
+  EEPROM.update(13, PIDenable);
+  EEPROM.update(14, beepEnable);
+  EEPROM.update(15, BodyFlip);
+  EEPROM.update(16, ECReverse);
+  EEPROM.update(17, CurrentTip);
+  EEPROM.update(18, NumberOfTips);
 
   uint8_t i, j;
-  uint16_t counter = 17;
+  uint16_t counter = 19;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
