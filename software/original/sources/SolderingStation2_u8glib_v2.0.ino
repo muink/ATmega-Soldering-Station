@@ -88,6 +88,7 @@
 #define TEMP280       308       // temperature at ADC = 280
 #define TEMP360       390       // temperature at ADC = 360
 #define TEMPCHP       30        // chip temperature while calibration
+#define INTEMPOFF     77        // internal temperature offset values
 #define TIPMAX        8         // max number of tips
 #define TIPNAMELENGTH 6         // max length of tip names (including termination)
 #define TIPNAME       "BC1.5"   // default tip name
@@ -130,6 +131,7 @@ double consKp=11, consKi=3, consKd=5;
 uint16_t  DefaultTemp = TEMP_DEFAULT;
 uint16_t  SleepTemp   = TEMP_SLEEP;
 uint8_t   BoostTemp   = TEMP_BOOST;
+int16_t   InTempOff   = INTEMPOFF;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
 uint8_t   timeOfBoost = TIMEOFBOOST;
@@ -932,8 +934,11 @@ double getChipTemp() {
   }
   bitClear (ADCSRA, ADEN);              // disable ADC  
   result >>= (1 + average);             // convert to 11bit
+  // https://github.com/sekdiy/CoreSensors/tree/46324136ee8307b4069d96e21da91f8ee3c44831?tab=readme-ov-file#calibration
+  // https://avdweb.nl/arduino/measurement/temperature-measurement#calibration
+  // https://web.archive.org/web/20160412171801/http://www.atmel.com/Images/doc8108.pdf
   // ((result - (324.31 * 2)) / (1.22 * 2)) // raised to 11bit
-  return ((result - 649) / 2.44);       // calculate internal temperature in degrees C
+  return ((result + InTempOff - 648.62) / 2.44); // calculate internal temperature in degrees C
 }
 
 
