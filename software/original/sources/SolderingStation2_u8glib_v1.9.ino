@@ -831,7 +831,7 @@ void InfoScreen() {
         u8g.setFont(u8g_font_9x15);
         u8g.setFontPosTop();
         u8g.setPrintPos(0,  0); u8g.print(F("Firmware: ")); u8g.print(VERSION);
-        u8g.setPrintPos(0, 16); u8g.print(F("Tmp: "));  u8g.print(fTmp, 1); u8g.print(F(" C"));
+        u8g.setPrintPos(0, 16); u8g.print(F("Tmp: "));  u8g.print(fTmp, 1); u8g.print(F(" \xB0""C"));
         u8g.setPrintPos(0, 32); u8g.print(F("Vin: "));  u8g.print(fVin, 1); u8g.print(F(" V"));
         u8g.setPrintPos(0, 48); u8g.print(F("Vcc:  ")); u8g.print(fVcc, 1); u8g.print(F(" V"));
       } while(u8g.nextPage());
@@ -1044,14 +1044,14 @@ double getChipTemp() {
   ADMUX = bit (REFS1) | bit (REFS0) | bit (MUX3); // set reference and mux
   delay(20);                            // wait for voltages to settle
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
-  for (uint8_t i=0; i<32; i++) {        // get 32 readings
+  for (uint8_t i=0; i<64; i++) {        // 12bit OSR * 4
     sleep_mode();                       // go to sleep while taking ADC sample
     while (bitRead(ADCSRA, ADSC));      // make sure sampling is completed
     result += ADC;                      // add them up
   }
   bitClear (ADCSRA, ADEN);              // disable ADC  
-  result >>= 2;                         // devide by 4
-  return ((result - 2594) / 9.76);      // calculate internal temperature in degrees C
+  result >>= 4;                         // convert to 12bit devide by 16
+  return ((result + InTempOff - 1297) / 4.88);// calculate internal temperature in degrees C
 }
 
 
