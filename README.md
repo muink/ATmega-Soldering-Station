@@ -32,7 +32,12 @@ T12 Quick Heating Soldering Station featuring
 - Storing user settings into the EEPROM
 - 允许热插拔烙铁头，并弹出烙铁头配置选择菜单
 - Tip change detection
+- 支援 N-沟道和 P-沟道 MOS管
 - Support for N-Channel and P-Channel MOSFETs
+- 支持屏幕翻转
+- Screen flip support
+- 支持编码器反转
+- Rotary encoder reverse support
 
 ## =========UI upgraded version =========
 
