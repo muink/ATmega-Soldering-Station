@@ -199,6 +199,10 @@ double    Input, Output, Setpoint, RawTemp, CurrentTemp, ChipTemp;
 
 // Variables for voltage readings
 uint16_t  Vcc, Vin;
+
+// Variables for IR sensor
+uint16_t  envLight;
+int       lastDist;
  
 // State variables
 bool      inSleepMode = false;
@@ -277,6 +281,9 @@ void setup() {
 
   // read supply voltages in mV
   Vcc = getVCC(); Vin = getVIN();
+
+  // read the value of ambient light from IR sensor
+  envLight = getHandleDistance(); lastDist = 0;
 
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
@@ -363,7 +370,7 @@ void SLEEPCheck() {
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  handleDocked = (DockinDistance > 0) && (getHandleDistance() >= DockinDistance);  // check the docking state of the handle
+  handleDocked = Docking();
   if ( (!inSleepMode) && ( ((time2sleep > 0) && (goneMinutes >= time2sleep)) || handleDocked ) ) {inSleepMode = true; inBoostMode = false; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
@@ -554,6 +561,29 @@ void SetIR() {
     if (BodyFlip) {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN, HIGH);}
     else          {digitalWrite(IRPOWB_PIN, HIGH); digitalWrite(IRPOWT_PIN,  LOW);}
   } else          {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN,  LOW);}
+}
+
+
+// check IR sensor and set docking status
+// =======================================================
+// envLightSet   Docked=true(Default)   Docked=false
+// envLight:10   Docked:30-10=20        undocked:10-10=0
+// envLight:30   Docked:30-30=0         undocked:10-30=-20
+// =======================================================
+//   0  to  20 --> set docked
+//   0  to -20 --> set undocked
+//  20  to   0 --> set undocked
+// -20  to   0 --> set docked
+//   0  to   0 --> keep
+// =======================================================
+bool Docking() {
+  bool status;
+  int Distance = getHandleDistance() - envLight;
+
+  if (DockinDistance > 0) status = (abs(Distance) >= DockinDistance) ? (Distance < 0 ? false : true) : (abs(lastDist) >= DockinDistance) ? (lastDist < 0 ? true : false) : handleDocked;
+  else                    status = false;
+  lastDist = Distance;
+  return status;
 }
 
 
@@ -808,8 +838,7 @@ void DockScreen(){
     bool lastbutton = (!digitalRead(BUTTON_PIN));
 
     do {
-      uint16_t Distance = getHandleDistance();
-      handleDocked = (Distance >= DockinDistance);
+      handleDocked = Docking();
 
       selected = getRotary();
       arrow = constrain(arrow + selected - lastselected, 0, 1);
@@ -818,7 +847,7 @@ void DockScreen(){
         do {
           u8g.setFont(u8g_font_9x15);
           u8g.setFontPosTop();
-          u8g.setPrintPos(0,   0); u8g.print(F("Distance: ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(Distance);
+          u8g.setPrintPos(0,   0); u8g.print(F("Dist:   ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(lastDist);
           u8g.setPrintPos(0,  16); u8g.print(F("Docked: ")); u8g.print(DockinDistance == 0 ? "N/A" : (handleDocked ? "Yes" : " No") );
           u8g.drawStr(0, 16 * (arrow + 2), ">");
           u8g.setPrintPos(12, 32); u8g.print(F("Set Distance"));
