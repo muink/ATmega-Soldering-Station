@@ -726,8 +726,11 @@ uint16_t InputScreen(const char *Items[]) {
 // information display screen
 void InfoScreen() {
   bool lastbutton = (!digitalRead(BUTTON_PIN));
+  uint8_t selected, window = 4, buffer = 5;
+  setRotary(0, buffer - window, 1, selected);
 
   do {
+    selected = getRotary();
     Vcc = getVCC();                     // read input voltage
     float fVcc = (float)Vcc / 1000;     // convert mV in V
     Vin = getVIN();                     // read supply voltage
@@ -737,10 +740,18 @@ void InfoScreen() {
       do {
         u8g.setFont(u8g_font_9x15);
         u8g.setFontPosTop();
-        u8g.setPrintPos(0,  0); u8g.print(F("Firmware: ")); u8g.print(VERSION);
-        u8g.setPrintPos(0, 16); u8g.print(F("Tmp: "));  u8g.print(fTmp, 1); u8g.print(F(" \xB0""C"));
-        u8g.setPrintPos(0, 32); u8g.print(F("Vin: "));  u8g.print(fVin, 1); u8g.print(F(" V"));
-        u8g.setPrintPos(0, 48); u8g.print(F("Vcc:  ")); u8g.print(fVcc, 1); u8g.print(F(" V"));
+        for (uint8_t i=0; i<window; i++) {
+          uint8_t drawnumber = selected + i;
+          u8g.setPrintPos(0, 16*i);
+          switch (drawnumber) {
+          case 0: u8g.print(F("Firmware: ")); u8g.print(VERSION); break;
+          case 1: u8g.print(F("Tmp: ")); u8g.print(fTmp, 1); u8g.print(F(" \xB0""C")); break;
+          case 2: u8g.print(F("Vin: ")); u8g.print(fVin, 1); u8g.print(F(" V")); break;
+          case 3: u8g.print(F("Vcc: ")); u8g.print(fVcc, 2); u8g.print(F(" V")); break;
+          case 4: u8g.print(F("...")); break;
+          default: break;
+          }
+        }
       } while(u8g.nextPage());
     if (lastbutton && digitalRead(BUTTON_PIN)) {delay(10); lastbutton = false;}
   } while (digitalRead(BUTTON_PIN) || lastbutton);
