@@ -206,6 +206,9 @@ double    Input, Output, Setpoint, RawTemp, CurrentTemp, ChipTemp;
 
 // Variables for voltage readings
 uint16_t  Vcc, Vin;
+
+// Variables for IR sensor
+int16_t   lastDist = 0;
  
 // State variables
 bool      inSleepMode = false;
@@ -389,7 +392,7 @@ void SENSORCheck() {
   analogWrite(CONTROL_PIN, HEATER_OFF);       // shut off heater in order to measure temperature
   delayMicroseconds(TIME2SETTLE);             // wait for voltage to settle
 
-  handleDocked = (DockinDistance > 0) && (getHandleLight() >= DockinDistance);  // set flag if handle is docked
+  if (handleDocked != Docking()) handleDocked = !handleDocked;  // set flag if handle is docked
   
   double temp = denoiseAnalog(SENSOR_PIN);    // read ADC value for temperature
   uint8_t d = digitalRead(SWITCH_PIN);        // check handle vibration switch
@@ -572,6 +575,18 @@ void SetIR() {
     if (BodyFlip) {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN, HIGH);}
     else          {digitalWrite(IRPOWB_PIN, HIGH); digitalWrite(IRPOWT_PIN,  LOW);}
   } else          {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN,  LOW);}
+}
+
+
+bool Docking() {
+  bool status;
+  uint16_t Distance = getHandleLight();
+
+  if (DockinDistance > 0) status = (Distance >= DockinDistance);
+  else                    status = false;
+
+  lastDist = Distance;
+  return status;
 }
 
 
@@ -838,8 +853,7 @@ void DockScreen(){
     bool lastbutton = (!digitalRead(BUTTON_PIN));
 
     do {
-      uint16_t Distance = getHandleLight();
-      handleDocked = (Distance >= DockinDistance);
+      handleDocked = Docking();
 
       selected = getRotary();
       arrow = constrain(arrow + selected - lastselected, 0, 1);
@@ -848,7 +862,7 @@ void DockScreen(){
         do {
           u8g.setFont(u8g_font_9x15);
           u8g.setFontPosTop();
-          u8g.setPrintPos(0,   0); u8g.print(F("Distance: ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(Distance);
+          u8g.setPrintPos(0,   0); u8g.print(F("Dist:   ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(lastDist);
           u8g.setPrintPos(0,  16); u8g.print(F("Docked: ")); u8g.print(DockinDistance == 0 ? "N/A" : (handleDocked ? "Yes" : " No") );
           u8g.drawStr(0, 16 * (arrow + 2), ">");
           u8g.setPrintPos(12, 32); u8g.print(F("Set Distance"));
