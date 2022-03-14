@@ -154,7 +154,7 @@ int16_t   InTempOff   = INTEMPOFF;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
 uint8_t   timeOfBoost = TIMEOFBOOST;
-uint16_t  DockinDistance = DOCKINDISTANCE;
+uint8_t   DockinDistance = DOCKINDISTANCE;
 uint8_t   MainScrType = MAINSCREEN;
 bool      PIDenable   = PID_ENABLE;
 bool      beepEnable  = BEEP_ENABLE;
@@ -206,6 +206,10 @@ double    Input, Output, Setpoint, RawTemp, CurrentTemp, ChipTemp;
 
 // Variables for voltage readings
 uint16_t  Vcc, Vin;
+
+// Variables for IR sensor
+uint16_t  envLight;
+int       lastDist;
  
 // State variables
 bool      inSleepMode = false;
@@ -287,6 +291,9 @@ void setup() {
 
   // read supply voltages in mV
   Vcc = getVCC(); Vin = getVIN();
+
+  // read the value of ambient light from IR sensor
+  envLight = getHandleLight(); lastDist = 0;
 
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
@@ -373,7 +380,7 @@ void SLEEPCheck() {
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  handleDocked = (DockinDistance > 0) && (getHandleDistance() >= DockinDistance);  // check the docking state of the handle
+  handleDocked = Docking();
   if ( (!inSleepMode) && ( ((time2sleep > 0) && (goneMinutes >= time2sleep)) || handleDocked ) ) {inSleepMode = true; inBoostMode = false; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
@@ -492,17 +499,17 @@ void getEEPROM() {
     time2sleep  =  EEPROM.read(7);
     time2off    =  EEPROM.read(8);
     timeOfBoost =  EEPROM.read(9);
-    DockinDistance = (EEPROM.read(10) << 8) | EEPROM.read(11);
-    MainScrType =  EEPROM.read(12);
-    PIDenable   =  EEPROM.read(13);
-    beepEnable  =  EEPROM.read(14);
-    BodyFlip    =  EEPROM.read(15);
-    ECReverse   =  EEPROM.read(16);
-    CurrentTip  =  EEPROM.read(17);
-    NumberOfTips = EEPROM.read(18);
+    DockinDistance = EEPROM.read(10);
+    MainScrType =  EEPROM.read(11);
+    PIDenable   =  EEPROM.read(12);
+    beepEnable  =  EEPROM.read(13);
+    BodyFlip    =  EEPROM.read(14);
+    ECReverse   =  EEPROM.read(15);
+    CurrentTip  =  EEPROM.read(16);
+    NumberOfTips = EEPROM.read(17);
 
     uint8_t i, j;
-    uint16_t counter = 19;
+    uint16_t counter = 18;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -530,18 +537,17 @@ void updateEEPROM() {
   EEPROM.update( 7, time2sleep);
   EEPROM.update( 8, time2off);
   EEPROM.update( 9, timeOfBoost);
-  EEPROM.update(10, DockinDistance >> 8);
-  EEPROM.update(11, DockinDistance & 0xFF);
-  EEPROM.update(12, MainScrType);
-  EEPROM.update(13, PIDenable);
-  EEPROM.update(14, beepEnable);
-  EEPROM.update(15, BodyFlip);
-  EEPROM.update(16, ECReverse);
-  EEPROM.update(17, CurrentTip);
-  EEPROM.update(18, NumberOfTips);
+  EEPROM.update(10, DockinDistance);
+  EEPROM.update(11, MainScrType);
+  EEPROM.update(12, PIDenable);
+  EEPROM.update(13, beepEnable);
+  EEPROM.update(14, BodyFlip);
+  EEPROM.update(15, ECReverse);
+  EEPROM.update(16, CurrentTip);
+  EEPROM.update(17, NumberOfTips);
 
   uint8_t i, j;
-  uint16_t counter = 19;
+  uint16_t counter = 18;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
@@ -565,6 +571,29 @@ void SetIR() {
     if (BodyFlip) {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN, HIGH);}
     else          {digitalWrite(IRPOWB_PIN, HIGH); digitalWrite(IRPOWT_PIN,  LOW);}
   } else          {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN,  LOW);}
+}
+
+
+// check IR sensor and set docking status
+// =======================================================
+// envLightSet   Docked=true(Default)   Docked=false
+// envLight:10   Docked:30-10=20        undocked:10-10=0
+// envLight:30   Docked:30-30=0         undocked:10-30=-20
+// =======================================================
+//   0  to  20 --> set docked
+//   0  to -20 --> set undocked
+//  20  to   0 --> set undocked
+// -20  to   0 --> set docked
+//   0  to   0 --> keep
+// =======================================================
+bool Docking() {
+  bool status;
+  int Distance = getHandleLight() - envLight;
+
+  if (DockinDistance > 0) status = (abs(Distance) >= DockinDistance) ? (Distance < 0 ? false : true) : (abs(lastDist) >= DockinDistance) ? (lastDist < 0 ? true : false) : handleDocked;
+  else                    status = false;
+  lastDist = Distance;
+  return status;
 }
 
 
@@ -830,8 +859,7 @@ void DockScreen(){
     bool lastbutton = (!digitalRead(BUTTON_PIN));
 
     do {
-      uint16_t Distance = getHandleLight();
-      handleDocked = (Distance >= DockinDistance);
+      handleDocked = Docking();
 
       selected = getRotary();
       arrow = constrain(arrow + selected - lastselected, 0, 1);
@@ -840,7 +868,7 @@ void DockScreen(){
         do {
           u8g.setFont(u8g_font_9x15);
           u8g.setFontPosTop();
-          u8g.setPrintPos(0,   0); u8g.print(F("Distance: ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(Distance);
+          u8g.setPrintPos(0,   0); u8g.print(F("Dist:   ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(lastDist);
           u8g.setPrintPos(0,  16); u8g.print(F("Docked: ")); u8g.print(DockinDistance == 0 ? "N/A" : (handleDocked ? "Yes" : " No") );
           u8g.drawStr(0, 16 * (arrow + 2), ">");
           u8g.setPrintPos(12, 32); u8g.print(F("Set Distance"));
