@@ -208,6 +208,7 @@ double    Input, Output, Setpoint, RawTemp, CurrentTemp, ChipTemp;
 uint16_t  Vcc, Vin;
 
 // Variables for IR sensor
+uint16_t  envLight;
 int16_t   lastDist = 0;
  
 // State variables
@@ -290,6 +291,9 @@ void setup() {
 
   // read supply voltages in mV
   Vcc = getVCC(); Vin = getVIN();
+
+  // read the value of ambient light from IR sensor
+  envLight = getHandleLight();
 
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
@@ -578,11 +582,25 @@ void SetIR() {
 }
 
 
+// check IR sensor and set docking status
+// =======================================================
+// Dist: -20          env           20
+// false  <------------*------------>  true
+// lastD: *---> true      false <---*
+// =======================================================
+// env     new     result
+//   0  to  20 --> set docked
+//   0  to -20 --> set undocked
+//  20  to   0 --> set undocked
+// -20  to   0 --> set docked
+//   0  to  10 --> keep
+//  20  to  30 --> keep
+// =======================================================
 bool Docking() {
   bool status;
-  uint16_t Distance = getHandleLight();
+  int16_t Distance = getHandleLight() - envLight;
 
-  if (DockinDistance > 0) status = (Distance >= DockinDistance);
+  if (DockinDistance > 0) status = (abs(Distance) >= DockinDistance) ? (Distance < 0 ? false : true) : (abs(lastDist) >= DockinDistance) ? (lastDist < 0 ? true : false) : handleDocked;
   else                    status = false;
 
   lastDist = Distance;
