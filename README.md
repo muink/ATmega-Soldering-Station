@@ -16,6 +16,8 @@ T12 Quick Heating Soldering Station featuring
 - Setup menu by long pressing rotary encoder switch
 - 手柄震动检测（需要手柄含有震动传感器）
 - Handle movement detection (by checking ball switch)
+- 烙铁上架检测（使用红外距离传感器）
+- Handle docked detection (by IR distance sensor)
 - 手柄连接检测（通过判断烙铁头温度是否能够被读取来实现）
 - Iron unconnected detection (by idenfying invalid temperature readings)
 - 定时器设定 - 随眠，关机时间
@@ -67,27 +69,21 @@ T12 Quick Heating Soldering Station featuring
 - 9 segments of temperature curve fitting
 
 ## Links:
-- Project Video: https://youtu.be/I9ATDxvQ1Bc
+- Project Link: https://easyeda.com/dropair/z-solderingstation-smd-v2_copy
+- Project Video (Orignal): https://youtu.be/I9ATDxvQ1Bc
 - Video from John Glavinos (electronics4all): https://youtu.be/4YDcWfOQmz4
 - Video from LHW-createskyblue (UI-v1.6L): https://b23.tv/LiOe54
 - A great hardware modification: https://oshwhub.com/222465.255411/atmega328p-han-tai
 
 # 2. Versions, Upgrades and Notes
 
-## Soldering Station v2.0:
+## Soldering Station v2.8:
 
-![IMG_20190731_190146_x.jpg](https://image.easyeda.com/pullimage/iSYD3M8FjNd8ndt1cC7noTcUAdRtz9oFH6hKmoNl.jpeg)
-![IMG_20190731_182904_x.jpg](https://image.easyeda.com/pullimage/kgryPQpReu7YGh16ewXIt2tQha6rTmhtARw9nPZh.jpeg)
-
-## Soldering Station v2.5:
-
-![IMG_20200621_132138_x2.jpg](https://image.easyeda.com/pullimage/8LPUnbOCw2uFf1ozHYkTESbvH1LjlA1zKstsrS5v.jpeg)
-![IMG_20200621_121350_x.jpg](https://image.easyeda.com/pullimage/5ZW6mQs1im9htCg3NJSryApeGUiSlwTFXnvxJSLq.jpeg)
-
-## Soldering Station v2.6:
-
-![IMG_20200816_141230_x.jpg](https://image.easyeda.com/pullimage/B0Crwq4ZAkTLbKYQlWMz32sMSgKbYp6pCCGzzExT.jpeg)
-![IMG_20200816_130923_x.jpg](https://image.easyeda.com/pullimage/BpBMLRUhObBq2KgvY0ECxCkv6uOqRW2V4trbMem0.jpeg)
+![Front.jpg](./image/2.8/Front.jpg "Front")
+![Back.jpg](./image/2.8/Back.jpg "Back")
+![PCB_top.jpg](./image/2.8/PCB_top.jpg "PCB_Top")
+![PCB_bottom.jpg](./image/2.8/PCB_bottom.jpg "PCB_Bottom")
+![I2C_Connector.jpg](./image/2.8/I2C_Connector.jpg "I2C_Connector")
 
 ## UI-V1.8t6 UI Upgrade by createskyblue & lihaoyun6
 
@@ -167,15 +163,23 @@ The microcontroller switches the heater on and off via the MOSFET. Since the tem
 
 In addition to the components for the PCB you will need the following:
 
-- 3D-printed case
-- Aviator Plug (4- or 5-pin depending on your iron handle)
-- DC Power Jack (5.5 * 2.1 mm)
-- Rocker Switch (KCD1 15 * 10 mm)
-- Some wires
-- 4 Self-tapping screws (2.3 * 5 mm)
+- 3D-printed case ***1**
+- SSD1306 0.96inch IC2 OLED ***1**
+- EC11 Rotary encoder ***1**
+- GX12-4P Aviator Plug ***1**
+- DC-5.5*2.1 Power Jack ***1**
+- KCD11 Rocker Switch ***1**
+- 22AWG Wires(Red/Black/Green) **~~**
+- 24AWG Wires(Black/Yellow) **~~**
+- Heat Shrink Tube **~~**
+- 20x10x2mm Neodymium Magnets ***4**
+- M2x5mm Self-tapping screws ***4**
 
-![parts.jpg](https://image.easyeda.com/pullimage/A29gEDpw2Ld6S96m6f88GDKLpD0YJHm0m3R5Tp5r.jpeg)
-![IMG_20200621_130414_x.jpg](https://image.easyeda.com/pullimage/NQZMhCwVRTmA4HVYrDjr6y938flXDBzT6woWXocX.jpeg)
+![Shell_0.jpg](./image/2.8/Shell_0.jpg "Parts")
+![Shell_1.jpg](./image/2.8/Shell_1.jpg "Wire_Connection_1")
+![Shell_2.jpg](./image/2.8/Shell_2.jpg "Wire_Connection_2")
+![Shell_3.jpg](./image/2.8/Shell_3.jpg "Shell_3")
+![Shell_4.jpg](./image/2.8/Shell_4.jpg "AssemblyPCB")
 
 Make sure that all parts fit nicely into the case. Solder the wires to the connectors and protect them with heat shrinks. Use thick wires (AWG18) for the power connections. Make all connections according to the schematic down below but keep in mind, that there's no standard pinout. Solder the wires directly to the corresponding pads on the pcb. To make the soldering station ESD-safe, connect the earth (E) terminal of the aviator plug to a female dupont connector and glue it into the corresponding opening on the case. Now you can connect the soldering station via a male dupont connector to an earth terminal. Upload the firmware and screw the pcb on top of the case.
 
