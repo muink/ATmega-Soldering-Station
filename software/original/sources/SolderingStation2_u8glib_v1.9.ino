@@ -9,6 +9,7 @@
 // - Boost mode by short pressing rotary encoder switch
 // - Setup menu by long pressing rotary encoder switch
 // - Handle movement detection (by checking ball switch)
+// - Handle docked detection (by IR distance sensor)
 // - Iron unconnected detection (by idenfying invalid temperature readings)
 // - Time driven sleep/power off mode if iron is unused (movement detection)
 // - Measurement of input voltage, Vcc and ATmega's internal temperature
@@ -44,6 +45,11 @@
 // Project Files (EasyEDA): https://easyeda.com/wagiminator
 // Project Files (Github):  https://github.com/wagiminator
 // License: http://creativecommons.org/licenses/by-sa/3.0/
+//
+// 2022 by dropair & muink
+// Project Files (EasyEDA): https://easyeda.com/dropair/z-solderingstation-smd-v2_copy
+// Project Files (Github):  https://github.com/muink/ATmega-Soldering-Station
+// License: http://creativecommons.org/licenses/by-sa/3.0/
 
 
 // Libraries
@@ -52,6 +58,9 @@
                                 // (old cpp version of https://github.com/mblythe86/C-PID-Library/tree/master/PID_v1)
 #include <EEPROM.h>             // for storing user settings into EEPROM
 #include <avr/sleep.h>          // for sleeping during ADC sampling
+
+// Hardware version
+#define HWVERSION     "v2.8"
 
 // Firmware version
 #define VERSION       "v1.9"
@@ -75,6 +84,12 @@
 #define CONTROL_PIN    9        // heater MOSFET PWM control
 #define SWITCH_PIN    10        // handle vibration switch
 
+// IR sensor Pins
+#define DOCKDETT_PIN  A6        // IR sensor (top) (screen flipped)
+#define DOCKDETB_PIN  A7        // IR sensor (bottom)
+#define IRPOWT_PIN     4        // IR sensor power supply (top) (screen flipped)
+#define IRPOWB_PIN    16        // IR sensor power supply (bottom)
+
 // Default temperature control values (recommended soldering temperature: 300-380°C)
 #define TEMP_MIN      150       // min selectable temperature
 #define TEMP_MAX      400       // max selectable temperature
@@ -96,6 +111,10 @@
 #define TIME2SLEEP     5        // time to enter sleep mode in minutes
 #define TIME2OFF      15        // time to shut off heater in minutes
 #define TIMEOFBOOST   40        // time to stay in boost mode in seconds
+
+// Default handle docked distance values (0 = disabled)
+#define DOCKINDISTANCE 12       // judgment value of handle docked. the closer the handle is, the higher the value
+#define DOCKINBITDEPTH 11       // IR sensor sampling depth. allowed values: 10-12
 
 // Control values
 #define TIME2SETTLE   950       // time in microseconds to allow OpAmp output to settle
@@ -129,6 +148,7 @@ double consKp=11, consKi=3, consKd=5;
 // Default values that can be changed by the user and stored in the EEPROM
 uint16_t  DefaultTemp = TEMP_DEFAULT;
 uint16_t  SleepTemp   = TEMP_SLEEP;
+uint16_t  DockinDistance = DOCKINDISTANCE;
 uint8_t   BoostTemp   = TEMP_BOOST;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
@@ -147,7 +167,7 @@ uint8_t   NumberOfTips = 1;
 
 // Menu items
 const char *SetupItems[]       = { "Setup Menu", "Tip Settings", "Temp Settings",
-                                   "Timer Settings", "Control Type", "Main Screen",
+                                   "Timer Settings", "Dock Settings", "Control Type", "Main Screen",
                                    "Buzzer", "Screen Flip", "EC Reverse", "Information", "Return" };
 const char *TipItems[]         = { "Tip:", "Change Tip", "Calibrate Tip", 
                                    "Rename Tip", "Delete Tip", "Add new Tip", "Return" };
@@ -168,6 +188,7 @@ const char *BoostTempItems[]   = { "Boost Temp", "\xB0""C" };
 const char *SleepTimerItems[]  = { "Sleep Timer", "Minutes" };
 const char *OffTimerItems[]    = { "Off Timer", "Minutes" };
 const char *BoostTimerItems[]  = { "Boost Timer", "Seconds" };
+const char *DistanceItems[]    = { "Set Distance", "\x4A" };
 const char *DeleteMessage[]    = { "Warning", "You cannot", "delete your", "last tip!" };
 const char *MaxTipMessage[]    = { "Warning", "You reached", "maximum number", "of tips!" };
 
@@ -175,7 +196,7 @@ const char *MaxTipMessage[]    = { "Warning", "You reached", "maximum number", "
 volatile uint8_t  a0, b0, c0, d0;
 volatile bool     ab0;
 volatile int      count, countMin, countMax, countStep;
-volatile bool     handleMoved;
+volatile bool     handleMoved, handleDocked = true;
  
 // Variables for temperature control
 uint16_t  SetTemp, ShowTemp, gap, Step;
@@ -183,6 +204,10 @@ double    Input, Output, Setpoint, RawTemp, CurrentTemp, ChipTemp;
 
 // Variables for voltage readings
 uint16_t  Vcc, Vin;
+
+// Variables for IR sensor
+uint16_t  envLight;
+int       lastDist;
  
 // State variables
 bool      inSleepMode = false;
@@ -218,6 +243,10 @@ void setup() {
   // set the pin modes
   pinMode(SENSOR_PIN,   INPUT);
   pinMode(VIN_PIN,      INPUT);
+  pinMode(DOCKDETB_PIN, INPUT);
+  pinMode(DOCKDETT_PIN, INPUT);
+  pinMode(IRPOWB_PIN,   OUTPUT);
+  pinMode(IRPOWT_PIN,   OUTPUT);
   pinMode(BUZZER_PIN,   OUTPUT);
   pinMode(CONTROL_PIN,  OUTPUT);
   pinMode(ROTARY_1_PIN, INPUT_PULLUP);
@@ -226,6 +255,8 @@ void setup() {
   pinMode(SWITCH_PIN,   INPUT_PULLUP);
   
   analogWrite(CONTROL_PIN, HEATER_OFF); // this shuts off the heater
+  digitalWrite(IRPOWB_PIN, LOW);        // must be LOW when IR sensor not in use
+  digitalWrite(IRPOWT_PIN, LOW);        // must be LOW when IR sensor not in use
   digitalWrite(BUZZER_PIN, LOW);        // must be LOW when buzzer not in use
 
   // setup ADC
@@ -250,12 +281,18 @@ void setup() {
   // set screen flip
   SetFlip();
 
+  // enable IR senor
+  SetIR();
+
   // read supply voltages in mV
   Vcc = getVCC(); Vin = getVIN();
 
+  // read the value of ambient light from IR sensor
+  envLight = getHandleDistance(); lastDist = 0;
+
   // read and set current iron temperature
   SetTemp  = DefaultTemp;
-  RawTemp  = denoiseAnalog(SENSOR_PIN);
+  RawTemp  = denoiseAnalog(10, SENSOR_PIN);
   ChipTemp = getChipTemp();
   calculateTemp();
 
@@ -302,7 +339,7 @@ void ROTARYCheck() {
     while( (!digitalRead(BUTTON_PIN)) && ((millis() - buttonmillis) < 500) );
     if ((millis() - buttonmillis) >= 500) SetupScreen();
     else {
-      inBoostMode = !inBoostMode;
+      inBoostMode = handleDocked ? false : !inBoostMode;
       if (inBoostMode) boostmillis = millis();
       handleMoved = true;
     }
@@ -324,21 +361,22 @@ void ROTARYCheck() {
 // check and activate/deactivate sleep modes
 void SLEEPCheck() {
   if (handleMoved) {                    // if handle was moved
-    if (inSleepMode) {                  // in sleep or off mode?
+    if (inSleepMode && !handleDocked) { // in sleep or off mode? and not docked (ready to work)
       if ((CurrentTemp + 20) < SetTemp) // if temp is well below setpoint
         analogWrite(CONTROL_PIN, HEATER_ON);    // then start the heater right now
       beep();                           // beep on wake-up
       beepIfWorky = true;               // beep again when working temperature is reached
+    inSleepMode = false;                // reset sleep flag
     }
     handleMoved = false;                // reset handleMoved flag
-    inSleepMode = false;                // reset sleep flag
     inOffMode   = false;                // reset off flag
     sleepmillis = millis();             // reset sleep timer
   }
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; beep();}
+  handleDocked = Docking();
+  if ( (!inSleepMode) && ( ((time2sleep > 0) && (goneMinutes >= time2sleep)) || handleDocked ) ) {inSleepMode = true; inBoostMode = false; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
 
@@ -348,7 +386,7 @@ void SENSORCheck() {
   analogWrite(CONTROL_PIN, HEATER_OFF);       // shut off heater in order to measure temperature
   delayMicroseconds(TIME2SETTLE);             // wait for voltage to settle
   
-  double temp = denoiseAnalog(SENSOR_PIN);    // read ADC value for temperature
+  double temp = denoiseAnalog(10, SENSOR_PIN);    // read ADC value for temperature
   uint8_t d = digitalRead(SWITCH_PIN);        // check handle vibration switch
   if (d != d0) {handleMoved = true; d0 = d;}  // set flag if handle was moved
   if (! SensorCounter--) Vin = getVIN();      // get Vin every now and then
@@ -380,7 +418,7 @@ void SENSORCheck() {
     ChangeTipScreen();                        // show tip selection screen
     updateEEPROM();                           // update setting in EEPROM
     handleMoved = true;                       // reset all timers
-    RawTemp  = denoiseAnalog(SENSOR_PIN);     // restart temp smooth algorithm
+    RawTemp  = denoiseAnalog(10, SENSOR_PIN);     // restart temp smooth algorithm
     c0 = LOW;                                 // switch must be released
     setRotary(TEMP_MIN, TEMP_MAX, TEMP_STEP, SetTemp);  // reset rotary encoder
   }
@@ -463,9 +501,10 @@ void getEEPROM() {
     ECReverse   =  EEPROM.read(14);
     CurrentTip  =  EEPROM.read(15);
     NumberOfTips = EEPROM.read(16);
+    DockinDistance = EEPROM.read(17);
 
     uint8_t i, j;
-    uint16_t counter = 17;
+    uint16_t counter = 18;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -500,9 +539,10 @@ void updateEEPROM() {
   EEPROM.update(14, ECReverse);
   EEPROM.update(15, CurrentTip);
   EEPROM.update(16, NumberOfTips);
+  EEPROM.update(17, DockinDistance);
 
   uint8_t i, j;
-  uint16_t counter = 17;
+  uint16_t counter = 18;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
@@ -520,6 +560,38 @@ void SetFlip() {
 }
 
 
+// check state and set IR sensor
+void SetIR() {
+  if (DockinDistance > 0) {
+    if (BodyFlip) {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN, HIGH);}
+    else          {digitalWrite(IRPOWB_PIN, HIGH); digitalWrite(IRPOWT_PIN,  LOW);}
+  } else          {digitalWrite(IRPOWB_PIN,  LOW); digitalWrite(IRPOWT_PIN,  LOW);}
+}
+
+
+// check IR sensor and set docking status
+// =======================================================
+// envLightSet   Docked=true(Default)   Docked=false
+// envLight:10   Docked:30-10=20        undocked:10-10=0
+// envLight:30   Docked:30-30=0         undocked:10-30=-20
+// =======================================================
+//   0  to  20 --> set docked
+//   0  to -20 --> set undocked
+//  20  to   0 --> set undocked
+// -20  to   0 --> set docked
+//   0  to   0 --> keep
+// =======================================================
+bool Docking() {
+  bool status;
+  int Distance = getHandleDistance() - envLight;
+
+  if (DockinDistance > 0) status = (abs(Distance) >= DockinDistance) ? (Distance < 0 ? false : true) : (abs(lastDist) >= DockinDistance) ? (lastDist < 0 ? true : false) : handleDocked;
+  else                    status = false;
+  lastDist = Distance;
+  return status;
+}
+
+
 // draws the main screen
 void MainScreen() {
   u8g.firstPage();
@@ -529,7 +601,8 @@ void MainScreen() {
     u8g.setFontPosTop();
     u8g.drawStr( 0, 0,  "SET:");
     u8g.setPrintPos(40,0);
-    u8g.print(Setpoint, 0);
+    if (handleDocked && (((millis() - sleepmillis) / 1000) < 3)) {u8g.print(SetTemp); u8g.print(F("*"));}
+    else                                                          u8g.print(Setpoint, 0);
 
     // draw status of heater
     u8g.setPrintPos(83,0);
@@ -577,12 +650,13 @@ void SetupScreen() {
       case 0:   TipScreen(); repeat = false; break;
       case 1:   TempScreen(); break;
       case 2:   TimerScreen(); break;
-      case 3:   PIDenable = MenuScreen(ControlTypeItems, sizeof(ControlTypeItems), PIDenable); break;
-      case 4:   MainScrType = MenuScreen(MainScreenItems, sizeof(MainScreenItems), MainScrType); break;
-      case 5:   beepEnable = MenuScreen(BuzzerItems, sizeof(BuzzerItems), beepEnable); break;
-      case 6:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); break;
-      case 7:   ECReverse = MenuScreen(ECReverseItems, sizeof(ECReverseItems), ECReverse); break;
-      case 8:   InfoScreen(); break;
+      case 3:   DockScreen(); break;
+      case 4:   PIDenable = MenuScreen(ControlTypeItems, sizeof(ControlTypeItems), PIDenable); break;
+      case 5:   MainScrType = MenuScreen(MainScreenItems, sizeof(MainScreenItems), MainScrType); break;
+      case 6:   beepEnable = MenuScreen(BuzzerItems, sizeof(BuzzerItems), beepEnable); break;
+      case 7:   BodyFlip = MenuScreen(FlipItems, sizeof(FlipItems), BodyFlip); SetFlip(); SetIR(); break;
+      case 8:   ECReverse = MenuScreen(ECReverseItems, sizeof(ECReverseItems), ECReverse); break;
+      case 9:   InfoScreen(); break;
       default:  repeat = false; break;
     }
   }  
@@ -702,6 +776,7 @@ void MessageScreen(const char *Items[], uint8_t numberOfItems) {
 // input value screen
 uint16_t InputScreen(const char *Items[]) {
   uint16_t  value;
+  bool isDistanceScreen = (Items[0] == "Set Distance");
   bool      lastbutton = (!digitalRead(BUTTON_PIN));
 
   do {
@@ -713,7 +788,15 @@ uint16_t InputScreen(const char *Items[]) {
         u8g.drawStr( 0, 0,  Items[0]);
         u8g.setPrintPos(0, 32); u8g.print(">"); u8g.setPrintPos(10, 32);        
         if (value == 0)  u8g.print(F("Deactivated"));
-        else            {u8g.print(value);u8g.print(" ");u8g.print(Items[1]);}
+        else {
+          u8g.print(value);u8g.print(" ");
+          if (isDistanceScreen) {
+            uint8_t w = u8g.getStrWidth(String(value).c_str()) + u8g.getStrWidth(" ");
+            u8g.setFont(u8g_font_9x15_78_79); int symbh = u8g.getFontAscent();
+            u8g.setPrintPos(10 + w, 32 + symbh);
+          }
+          u8g.print(Items[1]);
+        }
       } while(u8g.nextPage());
     if (lastbutton && digitalRead(BUTTON_PIN)) {delay(10); lastbutton = false;}
   } while (digitalRead(BUTTON_PIN) || lastbutton);
@@ -746,6 +829,46 @@ void InfoScreen() {
   } while (digitalRead(BUTTON_PIN) || lastbutton);
 
   beep();
+}
+
+
+// dock settings screen
+void DockScreen(){
+  uint8_t selected = 0;
+  bool repeat = true;
+  while (repeat) {
+    uint8_t lastselected = selected;
+    int8_t arrow = 0;
+    setRotary(0, 1, 1, selected);
+    bool lastbutton = (!digitalRead(BUTTON_PIN));
+
+    do {
+      handleDocked = Docking();
+
+      selected = getRotary();
+      arrow = constrain(arrow + selected - lastselected, 0, 1);
+      lastselected = selected;
+      u8g.firstPage();
+        do {
+          u8g.setFont(u8g_font_9x15);
+          u8g.setFontPosTop();
+          u8g.setPrintPos(0,   0); u8g.print(F("Dist:   ")); DockinDistance == 0 ? u8g.print("N/A") : u8g.print(lastDist);
+          u8g.setPrintPos(0,  16); u8g.print(F("Docked: ")); u8g.print(DockinDistance == 0 ? "N/A" : (handleDocked ? "Yes" : " No") );
+          u8g.drawStr(0, 16 * (arrow + 2), ">");
+          u8g.setPrintPos(12, 32); u8g.print(F("Set Distance"));
+          u8g.setPrintPos(12, 48); u8g.print(F("Return"));
+        } while(u8g.nextPage());
+      if (lastbutton && digitalRead(BUTTON_PIN)) {delay(10); lastbutton = false;}
+    } while (digitalRead(BUTTON_PIN) || lastbutton);
+
+    beep();
+
+    switch (selected) {
+      case 0:   setRotary(0, 1<<DOCKINBITDEPTH, 1, DockinDistance);
+                DockinDistance = InputScreen(DistanceItems); SetIR(); break;
+      default:  repeat = false; break;
+    }
+  }
 }
 
 
@@ -784,6 +907,7 @@ void ChangeTipScreen() {
 
 // temperature calibration screen
 void CalibrationScreen() {
+  inSleepMode ? inSleepMode = false : inBoostMode = false;
   uint16_t CalTempNew[4]; 
   for (uint8_t CalStep = 0; CalStep < 3; CalStep++) {
     SetTemp = CalTemp[CurrentTip][CalStep];
@@ -885,19 +1009,21 @@ void AddTipScreen() {
 
 
 // average several ADC readings in sleep mode to denoise
-uint16_t denoiseAnalog (byte port) {
-  uint16_t result = 0;
+uint16_t denoiseAnalog (uint8_t analog_deep, byte port) {
+  uint32_t buffer = 0;
+  analog_deep = constrain(analog_deep, 10, 13) - 10;
+  uint8_t average = constrain(6 - (analog_deep<<1), 0, 5);
   ADCSRA |= bit (ADEN) | bit (ADIF);    // enable ADC, turn off any pending interrupt
   if (port >= A0) port -= A0;           // set port and
   ADMUX = (0x0F & port) | bit(REFS0);   // reference to AVcc 
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
-  for (uint8_t i=0; i<32; i++) {        // get 32 readings
+  for (uint8_t i=0; i<(1 << analog_deep*2+average); i++) { // (10+analog_deep)bit OSR * 2^average
     sleep_mode();                       // go to sleep while taking ADC sample
     while (bitRead(ADCSRA, ADSC));      // make sure sampling is completed
-    result += ADC;                      // add them up
+    buffer += ADC;                      // add them up
   }
   bitClear (ADCSRA, ADEN);              // disable ADC
-  return (result >> 5);                 // devide by 32 and return value
+  return (buffer >> (analog_deep + average)); // convert to (10+analog_deep)bit devide by 2^analog_deep
 }
 
 
@@ -941,8 +1067,16 @@ uint16_t getVCC() {
 // get supply voltage in mV
 uint16_t getVIN() {
   long result;
-  result = denoiseAnalog (VIN_PIN);     // read supply voltage via voltage divider
+  result = denoiseAnalog (10, VIN_PIN);     // read supply voltage via voltage divider
   return (result * Vcc / 179.474);      // 179.474 = 1023 * R13 / (R12 + R13)
+}
+
+
+// get Handle Distanse
+uint16_t getHandleDistance() {
+  uint16_t result;
+  result = BodyFlip ? denoiseAnalog(DOCKINBITDEPTH, DOCKDETT_PIN) : denoiseAnalog(DOCKINBITDEPTH, DOCKDETB_PIN);
+  return (result + 1);
 }
 
 
