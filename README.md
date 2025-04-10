@@ -34,7 +34,12 @@ T12 Quick Heating Soldering Station featuring
 - Storing user settings into the EEPROM
 - 允许热插拔烙铁头，并弹出烙铁头配置选择菜单
 - Tip change detection
+- 支援 N-沟道和 P-沟道 MOS管
 - Support for N-Channel and P-Channel MOSFETs
+- 支持屏幕翻转
+- Screen flip support
+- 支持编码器反转
+- Rotary encoder reverse support
 
 ## =========UI upgraded version =========
 
@@ -73,7 +78,7 @@ T12 Quick Heating Soldering Station featuring
 - Project Video (Orignal): https://youtu.be/I9ATDxvQ1Bc
 - Video from John Glavinos (electronics4all): https://youtu.be/4YDcWfOQmz4
 - Video from LHW-createskyblue (UI-v1.6L): https://b23.tv/LiOe54
-- A great hardware modification: https://oshwhub.com/222465.255411/atmega328p-han-tai
+- T245 version with P-channel MOSFET by TaaraLabs: https://taaralabs.eu/atmega-t245/
 
 # 2. Versions, Upgrades and Notes
 
