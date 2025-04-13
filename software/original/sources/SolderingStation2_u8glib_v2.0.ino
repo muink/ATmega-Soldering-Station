@@ -903,19 +903,21 @@ uint16_t denoiseAnalog (byte port) {
 
 // get internal temperature by reading ADC channel 8 against 1.1V reference
 double getChipTemp() {
-  uint16_t result = 0;
+  int32_t result = 0;
+  uint8_t average = 5;
   ADCSRA |= bit (ADEN) | bit (ADIF);    // enable ADC, turn off any pending interrupt
   ADMUX = bit (REFS1) | bit (REFS0) | bit (MUX3); // set reference and mux
   delay(20);                            // wait for voltages to settle
   set_sleep_mode (SLEEP_MODE_ADC);      // sleep during sample for noise reduction
-  for (uint8_t i=0; i<32; i++) {        // get 32 readings
+  for (uint8_t i=0; i<(1 << 2 + average); i++) { // 11bit OSR * 2^average readings
     sleep_mode();                       // go to sleep while taking ADC sample
     while (bitRead(ADCSRA, ADSC));      // make sure sampling is completed
     result += ADC;                      // add them up
   }
   bitClear (ADCSRA, ADEN);              // disable ADC  
-  result >>= 2;                         // devide by 4
-  return ((result - 2594) / 9.76);      // calculate internal temperature in degrees C
+  result >>= (1 + average);             // convert to 11bit
+  // ((result - (324.31 * 2)) / (1.22 * 2)) // raised to 11bit
+  return ((result - 649) / 2.44);       // calculate internal temperature in degrees C
 }
 
 
@@ -934,6 +936,7 @@ uint16_t getVCC() {
   }
   bitClear (ADCSRA, ADEN);              // disable ADC  
   result >>= 4;                         // devide by 16
+  // 1.1/Vcc = result/1023
   return (1125300L / result);           // 1125300 = 1.1 * 1023 * 1000 
 }
 
@@ -942,6 +945,7 @@ uint16_t getVCC() {
 uint16_t getVIN() {
   long result;
   result = denoiseAnalog (VIN_PIN);     // read supply voltage via voltage divider
+  // result/1023 * Vcc / R13 = Vin / (R12 + R13)
   return (result * Vcc / 179.474);      // 179.474 = 1023 * R13 / (R12 + R13)
 }
 
