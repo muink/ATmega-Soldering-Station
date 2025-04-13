@@ -738,7 +738,7 @@ void InfoScreen() {
         u8g.setFont(u8g_font_9x15);
         u8g.setFontPosTop();
         u8g.setPrintPos(0,  0); u8g.print(F("Firmware: ")); u8g.print(VERSION);
-        u8g.setPrintPos(0, 16); u8g.print(F("Tmp: "));  u8g.print(fTmp, 1); u8g.print(F(" C"));
+        u8g.setPrintPos(0, 16); u8g.print(F("Tmp: "));  u8g.print(fTmp, 1); u8g.print(F(" \xB0""C"));
         u8g.setPrintPos(0, 32); u8g.print(F("Vin: "));  u8g.print(fVin, 1); u8g.print(F(" V"));
         u8g.setPrintPos(0, 48); u8g.print(F("Vcc:  ")); u8g.print(fVcc, 1); u8g.print(F(" V"));
       } while(u8g.nextPage());
