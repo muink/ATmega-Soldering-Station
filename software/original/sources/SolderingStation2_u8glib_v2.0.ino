@@ -44,6 +44,11 @@
 // Project Files (EasyEDA): https://easyeda.com/wagiminator
 // Project Files (Github):  https://github.com/wagiminator
 // License: http://creativecommons.org/licenses/by-sa/3.0/
+//
+// 2022 - 2025 by dropair & muink
+// Project Files (EasyEDA): https://easyeda.com/dropair/z-solderingstation-smd-v2_copy
+// Project Files (Github):  https://github.com/muink/ATmega-Soldering-Station
+// License: http://creativecommons.org/licenses/by-sa/3.0/
 
 
 // Libraries
@@ -52,6 +57,9 @@
                                 // (old cpp version of https://github.com/mblythe86/C-PID-Library/tree/master/PID_v1)
 #include <EEPROM.h>             // for storing user settings into EEPROM
 #include <avr/sleep.h>          // for sleeping during ADC sampling
+
+// Hardware version
+#define HWVERSION     "v2.8"
 
 // Firmware version
 #define VERSION       "v2.0"
