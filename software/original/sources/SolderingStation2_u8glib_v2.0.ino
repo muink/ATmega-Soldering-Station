@@ -51,10 +51,14 @@
 #include <PID_v1.h>             // https://github.com/wagiminator/ATmega-Soldering-Station/blob/master/software/libraries/Arduino-PID-Library.zip 
                                 // (old cpp version of https://github.com/mblythe86/C-PID-Library/tree/master/PID_v1)
 #include <EEPROM.h>             // for storing user settings into EEPROM
+#include <avr/boot.h>           // for bootloader
 #include <avr/sleep.h>          // for sleeping during ADC sampling
 
 // Firmware version
 #define VERSION       "v2.0"
+
+// signature row bytes from the chip
+uint8_t sr[10] = {0};
 
 // Type of MOSFET
 #define N_MOSFET                // P_MOSFET or N_MOSFET
@@ -248,6 +252,10 @@ void setup() {
   else if ( u8g.getMode() == U8G_MODE_GRAY2BIT ) u8g.setColorIndex(3);
   else if ( u8g.getMode() == U8G_MODE_BW )       u8g.setColorIndex(1);
   else if ( u8g.getMode() == U8G_MODE_HICOLOR )  u8g.setHiColorByRGB(255,255,255);
+
+  // read signature row bytes from the chip
+  for (int i=0; i<10; i++)
+    sr[i] = boot_signature_byte_get(i);
 
   // get default values from EEPROM
   getEEPROM();
@@ -731,7 +739,7 @@ uint16_t InputScreen(const char *Items[]) {
 // information display screen
 void InfoScreen() {
   bool lastbutton = (!digitalRead(BUTTON_PIN));
-  uint8_t selected, window = 4, buffer = 5;
+  uint8_t selected, window = 4, buffer = 9;
   setRotary(0, buffer - window, 1, selected);
 
   do {
@@ -753,7 +761,11 @@ void InfoScreen() {
           case 1: u8g.print(F("Tmp: ")); u8g.print(fTmp, 1); u8g.print(F(" \xB0""C")); break;
           case 2: u8g.print(F("Vin: ")); u8g.print(fVin, 1); u8g.print(F(" V")); break;
           case 3: u8g.print(F("Vcc: ")); u8g.print(fVcc, 2); u8g.print(F(" V")); break;
-          case 4: u8g.print(F("...")); break;
+          case 4: u8g.print(F("SIG1-2: ")); u8g.print(sr[0], HEX); u8g.print(" "); u8g.print(sr[1], HEX); break;
+          case 5: u8g.print(F("SIG3-4: ")); u8g.print(sr[2], HEX); u8g.print(" "); u8g.print(sr[3], HEX); break;
+          case 6: u8g.print(F("SIG5-6: ")); u8g.print(sr[4], HEX); u8g.print(" "); u8g.print(sr[5], HEX); break;
+          case 7: u8g.print(F("SIG7-8: ")); u8g.print(sr[6], HEX); u8g.print(" "); u8g.print(sr[7], HEX); break;
+          case 8: u8g.print(F("SIG9-A: ")); u8g.print(sr[8], HEX); u8g.print(" "); u8g.print(sr[9], HEX); break;
           default: break;
           }
         }
