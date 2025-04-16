@@ -1,0 +1,6 @@
+[submodule "software/libraries/u8glib"]
+	path = software/libraries/u8glib
+	url = https://github.com/olikraus/u8glib.git
+[submodule "software/libraries/Arduino-PID-Library"]
+	path = software/libraries/Arduino-PID-Library
+	url = https://github.com/br3ttb/Arduino-PID-Library.git
