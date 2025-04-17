@@ -213,6 +213,9 @@ PID ctrl(&Input, &Output, &Setpoint, aggKp, aggKi, aggKd, REVERSE);
   #error Wrong OLED controller type!
 #endif
 
+// Declare the denoiseAnalog function
+uint16_t denoiseAnalog (byte port, uint8_t analog_deep = 10);
+
 
 void setup() { 
   // set the pin modes
@@ -896,7 +899,7 @@ void AddTipScreen() {
 
 
 // average several ADC readings in sleep mode to denoise
-uint16_t denoiseAnalog (byte port, uint8_t analog_deep = 10) {
+uint16_t denoiseAnalog (byte port, uint8_t analog_deep) {
   uint32_t result = 0;
   analog_deep = constrain(analog_deep, 10, 13) - 10;
   uint8_t average = 5;
