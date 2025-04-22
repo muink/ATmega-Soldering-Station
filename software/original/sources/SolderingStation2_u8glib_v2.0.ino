@@ -353,6 +353,9 @@ void ROTARYCheck() {
       beepIfWorky = true;               // beep again when working temperature is reached
     }
   }
+
+  // disable boost mode while in sleep mode
+  if (inBoostMode && inSleepMode) inBoostMode = false;
 }
 
 
@@ -373,7 +376,7 @@ void SLEEPCheck() {
 
   // check time passed since the handle was moved
   goneMinutes = (millis() - sleepmillis) / 60000;
-  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; inBoostMode = false; beep();}
+  if ( (!inSleepMode) && (time2sleep > 0) && (goneMinutes >= time2sleep) ) {inSleepMode = true; beep();}
   if ( (!inOffMode)   && (time2off   > 0) && (goneMinutes >= time2off  ) ) {inOffMode   = true; beep();}
 }
 
@@ -893,6 +896,7 @@ void ChangeTipScreen() {
 
 // temperature calibration screen
 void CalibrationScreen() {
+  inSleepMode = false; inBoostMode = false;
   uint16_t CalTempNew[4]; 
   for (uint8_t CalStep = 0; CalStep < 3; CalStep++) {
     SetTemp = CalTemp[CurrentTip][CalStep];
