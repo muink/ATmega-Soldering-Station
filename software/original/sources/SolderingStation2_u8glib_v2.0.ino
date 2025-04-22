@@ -584,7 +584,9 @@ void MainScreen() {
     u8g.setFontPosTop();
     u8g.drawStr( 0, 0,  "SET:");
     u8g.setPrintPos(40,0);
-    u8g.print(Setpoint, 0);
+    // when handle is docked, move the handle (handleMoved = true) will briefly display the set temperature
+    if ( handleDocked && (((millis() - sleepmillis) / 1000) < 5) ) {u8g.print(SetTemp); u8g.print("*");}
+    else                                                            u8g.print(Setpoint, 0);
 
     // draw status of heater
     u8g.setPrintPos(83,0);
