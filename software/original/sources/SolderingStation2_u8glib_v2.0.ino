@@ -803,6 +803,7 @@ void ChangeTipScreen() {
 
 // temperature calibration screen
 void CalibrationScreen() {
+  inSleepMode = false; inBoostMode = false;
   uint16_t CalTempNew[4]; 
   for (uint8_t CalStep = 0; CalStep < 3; CalStep++) {
     SetTemp = CalTemp[CurrentTip][CalStep];
