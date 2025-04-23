@@ -53,6 +53,7 @@
 
 
 // Libraries
+#include <limits>               // for std::numeric_limits
 #include <U8glib.h>             // https://github.com/olikraus/u8glib
 #include <PID_v1.h>             // https://github.com/wagiminator/ATmega-Soldering-Station/blob/master/software/libraries/Arduino-PID-Library.zip 
                                 // (old cpp version of https://github.com/mblythe86/C-PID-Library/tree/master/PID_v1)
@@ -154,7 +155,7 @@ int16_t   InTempOff   = INTEMPOFF;
 uint8_t   time2sleep  = TIME2SLEEP;
 uint8_t   time2off    = TIME2OFF;
 uint8_t   timeOfBoost = TIMEOFBOOST;
-uint16_t  DockinDistance = DOCKINDISTANCE;
+uint8_t   DockinDistance = DOCKINDISTANCE;
 uint8_t   MainScrType = MAINSCREEN;
 bool      PIDenable   = PID_ENABLE;
 bool      beepEnable  = BEEP_ENABLE;
@@ -506,17 +507,17 @@ void getEEPROM() {
     time2sleep  =  EEPROM.read(7);
     time2off    =  EEPROM.read(8);
     timeOfBoost =  EEPROM.read(9);
-    DockinDistance = (EEPROM.read(10) << 8) | EEPROM.read(11);
-    MainScrType =  EEPROM.read(12);
-    PIDenable   =  EEPROM.read(13);
-    beepEnable  =  EEPROM.read(14);
-    BodyFlip    =  EEPROM.read(15);
-    ECReverse   =  EEPROM.read(16);
-    CurrentTip  =  EEPROM.read(17);
-    NumberOfTips = EEPROM.read(18);
+    DockinDistance = EEPROM.read(10);
+    MainScrType =  EEPROM.read(11);
+    PIDenable   =  EEPROM.read(12);
+    beepEnable  =  EEPROM.read(13);
+    BodyFlip    =  EEPROM.read(14);
+    ECReverse   =  EEPROM.read(15);
+    CurrentTip  =  EEPROM.read(16);
+    NumberOfTips = EEPROM.read(17);
 
     uint8_t i, j;
-    uint16_t counter = 19;
+    uint16_t counter = 18;
     for (i = 0; i < NumberOfTips; i++) {
       for (j = 0; j < TIPNAMELENGTH; j++) {
         TipName[i][j] = EEPROM.read(counter++);
@@ -544,18 +545,17 @@ void updateEEPROM() {
   EEPROM.update( 7, time2sleep);
   EEPROM.update( 8, time2off);
   EEPROM.update( 9, timeOfBoost);
-  EEPROM.update(10, DockinDistance >> 8);
-  EEPROM.update(11, DockinDistance & 0xFF);
-  EEPROM.update(12, MainScrType);
-  EEPROM.update(13, PIDenable);
-  EEPROM.update(14, beepEnable);
-  EEPROM.update(15, BodyFlip);
-  EEPROM.update(16, ECReverse);
-  EEPROM.update(17, CurrentTip);
-  EEPROM.update(18, NumberOfTips);
+  EEPROM.update(10, DockinDistance);
+  EEPROM.update(11, MainScrType);
+  EEPROM.update(12, PIDenable);
+  EEPROM.update(13, beepEnable);
+  EEPROM.update(14, BodyFlip);
+  EEPROM.update(15, ECReverse);
+  EEPROM.update(16, CurrentTip);
+  EEPROM.update(17, NumberOfTips);
 
   uint8_t i, j;
-  uint16_t counter = 19;
+  uint16_t counter = 18;
   for (i = 0; i < NumberOfTips; i++) {
     for (j = 0; j < TIPNAMELENGTH; j++) EEPROM.update(counter++, TipName[i][j]);
     for (j = 0; j < 4; j++) {
@@ -892,7 +892,7 @@ void DockScreen(){
     beep();
 
     switch (selected) {
-      case 0:   setRotary(0, 1<<DOCKINBITDEPTH, 1, DockinDistance);
+      case 0:   setRotary(0, std::numeric_limits<decltype(DockinDistance)>::max(), 1, DockinDistance);
                 DockinDistance = InputScreen(DistanceItems); SetIR(); break;
       default:  repeat = false; break;
     }
