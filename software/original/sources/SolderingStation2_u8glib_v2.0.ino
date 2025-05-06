@@ -53,7 +53,7 @@
 
 
 // Libraries
-#include <limits>               // for std::numeric_limits
+#include <limits.h>             // for UINT[N]_MAX
 #include <U8glib.h>             // https://github.com/olikraus/u8glib
 #include <PID_v1.h>             // https://github.com/wagiminator/ATmega-Soldering-Station/blob/master/software/libraries/Arduino-PID-Library.zip 
                                 // (old cpp version of https://github.com/mblythe86/C-PID-Library/tree/master/PID_v1)
@@ -892,7 +892,7 @@ void DockScreen(){
     beep();
 
     switch (selected) {
-      case 0:   setRotary(0, std::numeric_limits<decltype(DockinDistance)>::max(), 1, DockinDistance);
+      case 0:   setRotary(0, UINT8_MAX /* DockinDistance */, 1, DockinDistance);
                 DockinDistance = InputScreen(DistanceItems); SetIR(); break;
       default:  repeat = false; break;
     }
